@@ -1,0 +1,5 @@
+{
+  "name": "Physics Pendulum Master",
+  "description": "An interactive Simple Pendulum demonstration for high school physics, featuring real-time vector analysis, variable controls, and presentation-ready visualization.",
+  "requestFramePermissions": []
+}
