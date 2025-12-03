@@ -5,8 +5,12 @@ export const PIXELS_PER_METER = 125; // Scaling factor adjusted for 4m length (a
 
 // Vector Scaling factors
 export const SCALE_VELOCITY = 0.2; // Reduced to 1/4 of previous 0.8
-export const SCALE_ACCEL = 3;
-export const SCALE_FORCE = 2;
+export const SCALE_ACCEL = 1.5;
+// Significantly reduced because we no longer divide by mass/g.
+// Now it is roughly Pixels per Newton-Meter-Scaled unit.
+// Target: m=2.5kg -> G=24.5N -> ~100px.
+// Formula: Force * PPM * Scale. 24.5 * 125 * 0.035 = 107px.
+export const SCALE_FORCE = 0.035;
 
 // Colors
 export const COLORS = {

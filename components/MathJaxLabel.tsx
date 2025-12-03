@@ -84,7 +84,11 @@ export const MathJaxLabel: React.FC<MathJaxLabelProps> = React.memo(
       <span
         ref={ref}
         className={`inline-block align-middle ${className || ""}`}
-        style={{ color }}
+        style={{
+          color,
+          position: "relative",
+          bottom: "0.125em",
+        }}
       ></span>
     );
   },

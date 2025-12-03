@@ -80,37 +80,25 @@ export const Visualizer: React.FC<VisualizerProps> = ({
   const aTotalY = atVecY + anVecY;
 
   // --- Force Vectors ---
+  // Force vectors should scale with Mass. We removed the division by mass.
+  // Formula: Force * PIXELS_PER_METER * SCALE_FORCE
+
   const tensionMag = params.mass * (GRAVITY * Math.cos(state.theta) + anMag);
-  const tensionX =
-    (radX * tensionMag * PIXELS_PER_METER * SCALE_FORCE) / params.mass / 9.8;
-  const tensionY =
-    (radY * tensionMag * PIXELS_PER_METER * SCALE_FORCE) / params.mass / 9.8;
+  const tensionX = radX * tensionMag * PIXELS_PER_METER * SCALE_FORCE;
+  const tensionY = radY * tensionMag * PIXELS_PER_METER * SCALE_FORCE;
 
   // Gravity: Points straight down (0, 1)
   const gravityMag = params.mass * GRAVITY;
   const gravityX = 0;
-  const gravityY =
-    (gravityMag * PIXELS_PER_METER * SCALE_FORCE) / params.mass / 9.8;
+  const gravityY = gravityMag * PIXELS_PER_METER * SCALE_FORCE;
 
   // Gravity Components
-  // G_n (Radial Outward): Opposite to Radial Inward vector (radX, radY)
-  // G_n magnitude = mg * cos(theta)
-  // Direction: (-radX, -radY) which is (sin(theta), cos(theta))
   const GnMag = gravityMag * Math.cos(state.theta);
-  const GnVecX =
-    (-radX * GnMag * PIXELS_PER_METER * SCALE_FORCE) / params.mass / 9.8;
-  const GnVecY =
-    (-radY * GnMag * PIXELS_PER_METER * SCALE_FORCE) / params.mass / 9.8;
+  // Direction: (-radX, -radY)
+  const GnVecX = -radX * GnMag * PIXELS_PER_METER * SCALE_FORCE;
+  const GnVecY = -radY * GnMag * PIXELS_PER_METER * SCALE_FORCE;
 
-  // G_t (Tangential): magnitude = mg * sin(theta)
-  // Direction: Towards equilibrium (negative theta direction if theta>0). Same direction as restoring force.
-  // We can use the Tangential Unit Vector (tanX, tanY) defined as (cos, -sin).
-  // If theta > 0, we need vector pointing left-ish.
-  // Let's project G (0, G) onto tangential axis.
-  // Dot product of G(0,1) and Tan(tanX, tanY) is tanY = -sin(theta).
-  // Vector is (tanX * tanY * G, tanY * tanY * G)? No.
-  // Simpler: G_t is perpendicular to string.
-  // Or just subtract G - Gn? Gt = G - Gn vectorially.
+  // G_t (Tangential) = G - G_n
   const GtVecX = gravityX - GnVecX;
   const GtVecY = gravityY - GnVecY;
 
@@ -187,7 +175,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
   };
 
   // Helper to define markers dynamically
-  // refX="0" ensures the arrow attaches at its base, so the line doesn't poke through the tip
+  // refX="0" ensures the arrow attaches at its base
   const MarkerDef = ({ color }: { color: string }) => (
     <marker
       id={`arrowhead-${color.replace("#", "")}`}

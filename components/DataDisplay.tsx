@@ -16,6 +16,7 @@ const Row = ({
   unit,
   colorClass,
   hexColor,
+  digits = 2,
 }: {
   label: string;
   symbol: string;
@@ -23,6 +24,7 @@ const Row = ({
   unit: string;
   colorClass?: string;
   hexColor?: string;
+  digits?: number;
 }) => (
   <div className="flex items-center justify-between border-b border-slate-700 py-4 last:border-0">
     <div className="flex items-center gap-3">
@@ -36,16 +38,55 @@ const Row = ({
       <span
         className={`text-2xl font-mono font-bold ${colorClass || "text-slate-100"}`}
       >
-        {value.toFixed(2)}
+        {value.toFixed(digits)}
       </span>
       <span className="text-slate-500 ml-2 text-lg">{unit}</span>
     </div>
   </div>
 );
 
+// Helper: Calculate Exact Period using Arithmetic-Geometric Mean (AGM)
+// This solves the Complete Elliptic Integral of the First Kind K(k)
+const calculateExactPeriod = (
+  length: number,
+  gravity: number,
+  maxAngleDeg: number,
+) => {
+  // If angle is 0, return small angle approximation limit
+  if (maxAngleDeg === 0) return 2 * Math.PI * Math.sqrt(length / gravity);
+
+  const theta0 = maxAngleDeg * (Math.PI / 180);
+
+  // k = sin(theta0 / 2)
+  // We actually need AGM(1, cos(theta0/2))
+  let a = 1;
+  let b = Math.cos(theta0 / 2);
+
+  // 5-6 iterations are usually enough for double precision
+  for (let i = 0; i < 10; i++) {
+    const nextA = 0.5 * (a + b);
+    const nextB = Math.sqrt(a * b);
+
+    // Check convergence
+    if (Math.abs(a - b) < 1e-9) break;
+
+    a = nextA;
+    b = nextB;
+  }
+
+  // T = 2 * PI * sqrt(L/g) / AGM
+  return (2 * Math.PI * Math.sqrt(length / gravity)) / a;
+};
+
 export const DataDisplay: React.FC<DataDisplayProps> = ({ state, params }) => {
   // Calculations
-  const period = 2 * Math.PI * Math.sqrt(params.length / GRAVITY);
+
+  // Use Exact Period formula instead of Small Angle Approximation
+  const period = calculateExactPeriod(
+    params.length,
+    GRAVITY,
+    params.initialAngle,
+  );
 
   // Tangential Acceleration: a_t = g * sin(theta)
   const a_t = Math.abs(GRAVITY * Math.sin(state.theta));
@@ -65,14 +106,24 @@ export const DataDisplay: React.FC<DataDisplayProps> = ({ state, params }) => {
   // Gravity: G = mg
   const gravityForce = params.mass * GRAVITY;
 
+  // Angle in degrees
+  const angleDeg = (state.theta * 180) / Math.PI;
+
   return (
     <div className="h-full flex flex-col p-6 bg-slate-800 border-l border-slate-700 shadow-xl w-[420px] overflow-y-auto">
-      <div className="border-b border-slate-600 pb-4 mb-2">
-        <h2 className="text-2xl font-bold text-white mb-2">实时数据</h2>
-        <p className="text-slate-400 text-sm">单摆运动物理量</p>
+      <div className="pb-2 mb-2">
+        <h2 className="text-2xl font-bold text-white">实时数据</h2>
       </div>
 
       <div className="flex-1">
+        <Row
+          label="摆角"
+          symbol="\theta"
+          value={Math.abs(angleDeg)}
+          unit="°"
+          colorClass="text-slate-200"
+          digits={1}
+        />
         <Row
           label="理论周期"
           symbol="T"
@@ -140,8 +191,8 @@ export const DataDisplay: React.FC<DataDisplayProps> = ({ state, params }) => {
       </div>
 
       <div className="mt-8 p-4 bg-slate-900/50 rounded-lg border border-slate-700">
-        <h4 className="text-slate-400 text-sm mb-2 font-semibold">图例说明</h4>
-        <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+        <h4 className="text-slate-400 text mb-2 font-semibold">图例说明</h4>
+        <div className="grid grid-cols-2 gap-y-3 gap-x-2">
           <div className="flex items-center gap-2 text-green-400">
             <div className="w-3 h-3 bg-green-400 rounded-full"></div>
             <span>

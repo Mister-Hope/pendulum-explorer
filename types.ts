@@ -9,6 +9,7 @@ export interface PhysicsParams {
   mass: number; // kg
   length: number; // meters
   gravity: number; // m/s^2
+  initialAngle: number; // degrees
 }
 
 export interface VectorConfig {

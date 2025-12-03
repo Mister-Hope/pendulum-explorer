@@ -8,16 +8,17 @@ import {
   SimulationMode,
   VectorConfig,
 } from "./types";
-import { GRAVITY, DT, MAX_ANGLE_DEG } from "./constants";
+import { GRAVITY, DT } from "./constants";
 
 const INITIAL_PARAMS: PhysicsParams = {
   mass: 2.0,
   length: 2.0,
   gravity: GRAVITY,
+  initialAngle: 30,
 };
 
 const INITIAL_STATE: SimulationState = {
-  theta: MAX_ANGLE_DEG * (Math.PI / 180), // Start at 30 degrees
+  theta: INITIAL_PARAMS.initialAngle * (Math.PI / 180),
   omega: 0,
   alpha: 0,
   time: 0,
@@ -36,33 +37,98 @@ const App: React.FC = () => {
   const [mode, setMode] = useState<SimulationMode>(SimulationMode.PAUSED);
   const [vectors, setVectors] = useState<VectorConfig>(INITIAL_VECTORS);
 
-  const requestRef = useRef<number>();
-  const lastTimeRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
+  const lastTimeRef = useRef<number | undefined>(undefined);
+  const accumulatorRef = useRef<number>(0);
 
-  const reset = useCallback(() => {
-    setState(INITIAL_STATE);
+  // Use a Ref to store the latest physics state.
+  // This decoupling prevents React StrictMode's double-invoke from messing up the time accumulator.
+  const stateRef = useRef<SimulationState>(INITIAL_STATE);
+
+  // Core function to reset physics state to the current "Max Angle" (Amplitude)
+  const initializeState = useCallback(() => {
+    const startState = {
+      theta: params.initialAngle * (Math.PI / 180),
+      omega: 0,
+      alpha: 0,
+      time: 0,
+    };
+    stateRef.current = startState;
+    setState(startState);
+    accumulatorRef.current = 0;
+    lastTimeRef.current = undefined;
+  }, [params.initialAngle]);
+
+  // Live Update: Whenever the Max Angle (initialAngle) slider changes,
+  // immediately update the simulation state to reflect this new amplitude.
+  // This allows the user to "drag" the pendulum by moving the slider.
+  useEffect(() => {
+    initializeState();
+  }, [initializeState]);
+
+  // Manual Reset Button: Resets state AND pauses the simulation
+  const handleReset = () => {
+    initializeState();
     setMode(SimulationMode.PAUSED);
-  }, []);
+  };
 
+  // Runge-Kutta 4 (RK4) Integration for higher precision
   const updatePhysics = useCallback(
     (
       currentState: SimulationState,
       currentParams: PhysicsParams,
       dt: number,
     ): SimulationState => {
-      // Simple Pendulum Equation: alpha = -(g/L) * sin(theta)
-      // Using semi-implicit Euler integration for better stability
+      const { theta, omega } = currentState;
+      const { gravity, length } = currentParams;
 
-      const alpha =
-        -(currentParams.gravity / currentParams.length) *
-        Math.sin(currentState.theta);
-      const newOmega = currentState.omega + alpha * dt;
-      const newTheta = currentState.theta + newOmega * dt;
+      // Define the state derivatives: dTheta/dt = omega, dOmega/dt = -g/L * sin(theta)
+      const evaluateDerivatives = (t: number, th: number, om: number) => {
+        return {
+          dTheta: om,
+          dOmega: -(gravity / length) * Math.sin(th),
+        };
+      };
+
+      // k1
+      const k1 = evaluateDerivatives(0, theta, omega);
+
+      // k2
+      const k2 = evaluateDerivatives(
+        0 + dt * 0.5,
+        theta + k1.dTheta * dt * 0.5,
+        omega + k1.dOmega * dt * 0.5,
+      );
+
+      // k3
+      const k3 = evaluateDerivatives(
+        0 + dt * 0.5,
+        theta + k2.dTheta * dt * 0.5,
+        omega + k2.dOmega * dt * 0.5,
+      );
+
+      // k4
+      const k4 = evaluateDerivatives(
+        0 + dt,
+        theta + k3.dTheta * dt,
+        omega + k3.dOmega * dt,
+      );
+
+      // Combine
+      const newTheta =
+        theta +
+        (dt / 6.0) * (k1.dTheta + 2 * k2.dTheta + 2 * k3.dTheta + k4.dTheta);
+      const newOmega =
+        omega +
+        (dt / 6.0) * (k1.dOmega + 2 * k2.dOmega + 2 * k3.dOmega + k4.dOmega);
+
+      // Calculate instantaneous alpha for display (based on new position)
+      const newAlpha = -(gravity / length) * Math.sin(newTheta);
 
       return {
         theta: newTheta,
         omega: newOmega,
-        alpha: alpha,
+        alpha: newAlpha,
         time: currentState.time + dt,
       };
     },
@@ -72,50 +138,64 @@ const App: React.FC = () => {
   const animate = useCallback(
     (time: number) => {
       if (lastTimeRef.current !== undefined) {
-        // Use fixed time step for physics consistency, but run loop
-        // We process only if mode is running or specific pause conditions are active
+        // Calculate real delta time in seconds
+        const frameTime = Math.min((time - lastTimeRef.current) / 1000, 0.1); // Clamp to 0.1s
 
-        setState((prevState) => {
-          // If hard paused, don't update
-          if (mode === SimulationMode.PAUSED) return prevState;
+        // Update accumulator
+        accumulatorRef.current += frameTime;
 
-          // Calculate next step
-          const nextState = updatePhysics(prevState, params, DT);
+        // Only process physics if not paused
+        if (mode !== SimulationMode.PAUSED) {
+          let active = true;
+          // Work on the ref state directly
+          let nextState = { ...stateRef.current };
 
-          // Check Pause Conditions
-          if (mode === SimulationMode.PAUSE_AT_BOTTOM) {
-            // Detect zero crossing of Theta
-            if (
-              (prevState.theta > 0 && nextState.theta <= 0) ||
-              (prevState.theta < 0 && nextState.theta >= 0)
-            ) {
-              setMode(SimulationMode.PAUSED);
-              return { ...nextState, theta: 0 }; // Snap to 0
-            }
-          }
+          // Process fixed time steps
+          // The mutation of accumulatorRef happens HERE, outside of setState
+          while (accumulatorRef.current >= DT && active) {
+            // We need to pass the 'previous step state' to calculate the 'next step state'
+            const prevState = nextState;
+            nextState = updatePhysics(nextState, params, DT);
+            accumulatorRef.current -= DT;
 
-          if (mode === SimulationMode.PAUSE_AT_TOP) {
-            // Detect velocity zero crossing (Turning point) AND we are on the positive side (Right)
-            // We define "Right" as theta > 0.
-            // Turning point means omega changes sign.
-
-            // Note: omega changes sign at both extremes. We only want right side (positive theta).
-            if (prevState.theta > 0.1) {
-              // Ensure we aren't near bottom
+            // Check Pause Conditions
+            if (mode === SimulationMode.PAUSE_AT_BOTTOM) {
+              // Detect zero crossing of Theta
               if (
-                (prevState.omega > 0 && nextState.omega <= 0) ||
-                (prevState.omega < 0 && nextState.omega >= 0)
+                (prevState.theta > 0 && nextState.theta <= 0) ||
+                (prevState.theta < 0 && nextState.theta >= 0)
               ) {
-                // We reached the peak
                 setMode(SimulationMode.PAUSED);
-                return { ...nextState, omega: 0 }; // Snap velocity to 0
+                nextState.theta = 0;
+                active = false;
+              }
+            }
+
+            if (mode === SimulationMode.PAUSE_AT_TOP) {
+              // Detect velocity zero crossing (Turning point) on the Right side (theta > 0)
+              if (prevState.theta > 0.1) {
+                if (
+                  (prevState.omega > 0 && nextState.omega <= 0) ||
+                  (prevState.omega < 0 && nextState.omega >= 0)
+                ) {
+                  setMode(SimulationMode.PAUSED);
+                  nextState.omega = 0;
+                  active = false;
+                }
               }
             }
           }
 
-          return nextState;
-        });
+          // Update the ref
+          stateRef.current = nextState;
+          // Trigger React render with the new state
+          setState(nextState);
+        } else {
+          // If paused, just reset accumulator to avoid jump on resume
+          accumulatorRef.current = 0;
+        }
       }
+
       lastTimeRef.current = time;
       requestRef.current = requestAnimationFrame(animate);
     },
@@ -132,8 +212,8 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden text-slate-100 font-sans bg-slate-900">
       {/* Navigation Bar */}
-      <header class="px-6 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center shrink-0 h-16">
-        <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+      <header className="px-6 py-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center shrink-0 h-16">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
           单摆演示教学系统
         </h1>
       </header>
@@ -146,7 +226,7 @@ const App: React.FC = () => {
           setParams={setParams}
           mode={mode}
           setMode={setMode}
-          reset={reset}
+          reset={handleReset}
           vectors={vectors}
           setVectors={setVectors}
         />

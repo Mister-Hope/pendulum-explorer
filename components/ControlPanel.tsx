@@ -37,14 +37,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   return (
     <div className="h-full flex flex-col gap-8 p-6 bg-slate-800 border-r border-slate-700 shadow-xl overflow-y-auto w-80 z-10">
-      {/* Header */}
-      <div className="border-b border-slate-600 pb-4">
-        <h2 className="text-2xl font-bold text-white mb-2">模型调控</h2>
-        <p className="text-slate-400 text-sm">调节参数以观察变化</p>
-      </div>
-
       {/* Sliders */}
-      <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">参数调节</h2>
         <div>
           <label className="block text-lg font-medium text-slate-200 mb-2">
             摆球质量 m (kg)
@@ -67,7 +62,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
 
-        <div>
+        <div className="mt-6">
           <label className="block text-lg font-medium text-slate-200 mb-2">
             摆绳长度 L (m)
           </label>
@@ -88,6 +83,31 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </span>
           </div>
         </div>
+
+        <div className="mt-6">
+          <label className="block text-lg font-medium text-slate-200 mb-2">
+            最大摆角 (振幅)
+          </label>
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min="0"
+              max="30"
+              step="1"
+              value={params.initialAngle}
+              onChange={(e) =>
+                setParams({
+                  ...params,
+                  initialAngle: parseFloat(e.target.value),
+                })
+              }
+              className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
+            <span className="text-xl font-mono text-sky-400 w-16 text-right">
+              {params.initialAngle.toFixed(0)}°
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Playback Controls */}
@@ -101,7 +121,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 isRunning ? SimulationMode.PAUSED : SimulationMode.RUNNING,
               )
             }
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-lg transition-colors ${
+            className={`flex items-center justify-start gap-2 px-4 py-3 rounded-lg font-bold text-lg transition-colors ${
               isRunning
                 ? "bg-amber-600 hover:bg-amber-500 text-white"
                 : "bg-green-600 hover:bg-green-500 text-white"
@@ -225,7 +245,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       <div className="mt-auto pt-4 text-xs text-slate-500 text-center">
-        Created by Senior Frontend Engineer
+        制作者：
+        <a
+          href="https://github.com/mister-hope"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Mister Hope
+        </a>
       </div>
     </div>
   );
