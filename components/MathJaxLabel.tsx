@@ -18,10 +18,9 @@ export const MathJaxLabel: React.FC<MathJaxLabelProps> = React.memo(
 
     useEffect(() => {
       let isMounted = true;
+      let checkInterval: any = null;
 
       const typeset = async () => {
-        if (!window.MathJax) return;
-
         // Check ref before starting
         if (!ref.current) return;
 
@@ -62,10 +61,22 @@ export const MathJaxLabel: React.FC<MathJaxLabelProps> = React.memo(
         }
       };
 
-      typeset();
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        typeset();
+      } else {
+        checkInterval = setInterval(() => {
+          if (window.MathJax && window.MathJax.typesetPromise) {
+            clearInterval(checkInterval);
+            if (isMounted) {
+              typeset();
+            }
+          }
+        }, 100);
+      }
 
       return () => {
         isMounted = false;
+        if (checkInterval) clearInterval(checkInterval);
       };
     }, [latex, color]);
 
