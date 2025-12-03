@@ -150,7 +150,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({
             x={endX + (dx > 0 ? 10 : -30)}
             y={endY + (dy > 0 ? 20 : -10)}
             fill={color}
-            fontSize="16"
+            fontSize="30"
             fontWeight="bold"
             style={{ textShadow: "0px 0px 4px #000" }}
           >

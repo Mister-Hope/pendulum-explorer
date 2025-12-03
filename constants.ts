@@ -5,8 +5,8 @@ export const PIXELS_PER_METER = 125; // Scaling factor adjusted for 4m length (a
 
 // Vector Scaling factors
 export const SCALE_VELOCITY = 0.2; // Reduced to 1/4 of previous 0.8
-export const SCALE_ACCEL = 1.5;
-export const SCALE_FORCE = 0.8;
+export const SCALE_ACCEL = 3;
+export const SCALE_FORCE = 2;
 
 // Colors
 export const COLORS = {
